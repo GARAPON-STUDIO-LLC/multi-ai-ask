@@ -44,6 +44,8 @@ interface ButtonInfo {
   label: string;
   text: string;
   cls: string;
+  hasSvg: boolean;
+  disabled: boolean;
 }
 interface TextBlock {
   len: number;
@@ -74,20 +76,27 @@ async function dumpInteractive(page: Page) {
   });
   console.log('\n--- 入力欄候補 ---');
   inputs.forEach((i) => console.log(JSON.stringify(i)));
+}
 
+async function dumpButtons(page: Page, label: string) {
+  // アイコンのみ（テキスト/aria-label 無し）のボタンも含めて拾う。送信ボタンは大抵これ。
   const buttons: ButtonInfo[] = await pageEval(page, () => {
     const out: ButtonInfo[] = [];
     document.querySelectorAll('button, [role="button"]').forEach((el) => {
       const e = el as HTMLElement;
-      const label = e.getAttribute('aria-label') ?? '';
-      const text = (e.innerText ?? '').trim().slice(0, 30);
       const visible = !!(e.offsetParent || e.getClientRects().length);
-      if (!visible || (!label && !text)) return;
-      out.push({ label, text, cls: String(e.className ?? '').slice(0, 60) });
+      if (!visible) return;
+      out.push({
+        label: e.getAttribute('aria-label') ?? '',
+        text: (e.innerText ?? '').trim().slice(0, 30),
+        cls: String(e.className ?? '').slice(0, 70),
+        hasSvg: !!e.querySelector('svg'),
+        disabled: (e as HTMLButtonElement).disabled || e.getAttribute('aria-disabled') === 'true',
+      });
     });
-    return out.slice(0, 40);
+    return out.slice(0, 50);
   });
-  console.log('\n--- ボタン候補（可視・最大40）---');
+  console.log(`\n--- ${label}（可視・最大50）---`);
   buttons.forEach((b) => console.log(JSON.stringify(b)));
 }
 
@@ -127,22 +136,23 @@ async function main() {
   console.log('現在の URL:', page.url());
 
   await dumpInteractive(page);
+  await dumpButtons(page, 'ボタン候補（入力前）');
 
   if (!DO_SUBMIT) {
     console.log('\n[入力側のみ] 送信して結果も観察するには SUBMIT=1 を付けて再実行:');
     console.log('  SUBMIT=1 npm run debug:manus');
   } else {
     console.log(`\nプロンプトを送信します: "${PROMPT}"`);
-    const composer = (await page.locator('textarea').count())
-      ? page.locator('textarea').first()
-      : page.locator('[contenteditable="true"]').first();
+    const composer = page.locator('div[contenteditable="true"].tiptap, [contenteditable="true"], textarea').first();
 
     if (!(await composer.count())) {
       console.log('入力欄が見つかりませんでした。上の「入力欄候補」を確認してください。');
     } else {
       await composer.click();
       await composer.pressSequentially(PROMPT, { delay: 15 });
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(800);
+      // テキスト入力後に現れる送信ボタンを探す
+      await dumpButtons(page, 'ボタン候補（テキスト入力後・この中に送信ボタンがあるはず）');
       await composer.press('Enter');
       console.log('Enter を押しました。URL 遷移・ログイン要求・結果を観察します（最大約4分）…');
 
