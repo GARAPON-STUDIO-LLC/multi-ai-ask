@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "setup-login": "tsx scripts/setup-login.ts"
+    "setup-login": "tsx scripts/setup-login.ts",
+    "debug:claude": "tsx scripts/debug-claude.ts"
   },
   "dependencies": {
     "next": "16.2.9",

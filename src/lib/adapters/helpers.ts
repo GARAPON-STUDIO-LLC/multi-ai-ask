@@ -55,8 +55,13 @@ interface StreamOptions {
   readText: () => Promise<string>;
   /** 生成中かどうかを返す関数 */
   isGenerating: () => Promise<boolean>;
-  /** テキストがこの時間変化しなければ完了とみなす（ms） */
+  /** 生成インジケータが消えたあと、テキストがこの時間変化しなければ完了（ms） */
   stableMs?: number;
+  /**
+   * 生成インジケータが信頼できない（取れない/誤検知で消えない）場合の保険。
+   * 回答が出ていて、テキストがこの時間変化しなければインジケータに関係なく完了とみなす（ms）。
+   */
+  longStableMs?: number;
   /** ポーリング間隔（ms） */
   pollMs?: number;
   /** 全体のタイムアウト（ms） */
@@ -69,6 +74,7 @@ interface StreamOptions {
  */
 export async function* streamUntilStable(opts: StreamOptions): AsyncGenerator<string> {
   const stableMs = opts.stableMs ?? 1500;
+  const longStableMs = opts.longStableMs ?? 4000;
   const pollMs = opts.pollMs ?? 400;
   const timeoutMs = opts.timeoutMs ?? 180_000;
 
@@ -87,10 +93,13 @@ export async function* streamUntilStable(opts: StreamOptions): AsyncGenerator<st
       yield text;
     }
 
-    const stable = Date.now() - lastChangeAt >= stableMs;
-    // 生成インジケータが消え、かつテキストが安定したら完了。
-    // （インジケータを一度も観測できなかった場合は安定だけで判定する）
-    if (!generating && stable && (sawGenerating || last.length > 0)) {
+    const idleMs = Date.now() - lastChangeAt;
+    // 通常完了: 生成インジケータが消え、かつテキストが stableMs 安定したら完了。
+    if (!generating && idleMs >= stableMs && (sawGenerating || last.length > 0)) {
+      return;
+    }
+    // 保険: インジケータが信頼できなくても、回答が出ていて longStableMs 安定したら完了。
+    if (last.length > 0 && idleMs >= longStableMs) {
       return;
     }
     await new Promise((r) => setTimeout(r, pollMs));

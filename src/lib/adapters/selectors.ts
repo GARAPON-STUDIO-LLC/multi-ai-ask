@@ -27,11 +27,14 @@ export const SELECTORS: Record<Exclude<ServiceId, 'manus'>, SiteSelectors> = {
       'button[aria-label*="Send"]',
     ],
     generatingIndicator: [
+      // 注意: `[aria-label*="停止"]` は生成終了後も残る別ボタンを誤検知するため使わない。
+      // Claude は完了検知をテキスト安定（helpers の longStableMs）に依存させる。
+      'button[aria-label="応答を停止"]',
       'button[aria-label="Stop response"]',
       'button[aria-label*="Stop"]',
-      'button[aria-label*="停止"]',
     ],
-    assistantMessage: ['div.font-claude-message', '[data-testid="assistant-message"]'],
+    // claude.ai の回答コンテナ。font-claude-message は廃止され font-claude-response が現行。
+    assistantMessage: ['div.font-claude-response', 'div.font-claude-message', '[data-testid="assistant-message"]'],
     loginIndicator: [
       'input[name="email"]',
       'button:has-text("Continue with Google")',
