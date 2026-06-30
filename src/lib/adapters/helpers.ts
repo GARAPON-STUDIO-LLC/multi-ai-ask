@@ -98,8 +98,10 @@ export async function* streamUntilStable(opts: StreamOptions): AsyncGenerator<st
     if (!generating && idleMs >= stableMs && (sawGenerating || last.length > 0)) {
       return;
     }
-    // 保険: インジケータが信頼できなくても、回答が出ていて longStableMs 安定したら完了。
-    if (last.length > 0 && idleMs >= longStableMs) {
+    // 保険: 生成インジケータを一度も検知できなかった場合のみ、回答が出ていて
+    // longStableMs 安定したら完了とみなす。
+    // （インジケータが効いている間は web 検索などで一時停止しても誤完了しない）
+    if (!sawGenerating && last.length > 0 && idleMs >= longStableMs) {
       return;
     }
     await new Promise((r) => setTimeout(r, pollMs));
