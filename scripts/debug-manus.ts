@@ -21,6 +21,16 @@ const MANUS_URL = process.env.MANUS_URL ?? 'https://manus.im/';
 const DO_SUBMIT = process.env.SUBMIT === '1';
 const PROMPT = process.env.PROMPT ?? '日本の首都はどこですか？一言で答えてください。';
 
+/**
+ * tsx(esbuild) は keepNames で関数に __name ヘルパを挿入する。その関数を
+ * page.evaluate でブラウザに渡すと __name が未定義でエラーになるため、
+ * 評価の直前にブラウザ側へ __name を定義してから関数を評価する。
+ */
+async function pageEval<T>(page: Page, fn: () => T): Promise<T> {
+  await page.evaluate('globalThis.__name = globalThis.__name || function (f) { return f; }');
+  return page.evaluate(fn);
+}
+
 interface InputInfo {
   kind: string;
   tag: string;
@@ -43,7 +53,7 @@ interface TextBlock {
 }
 
 async function dumpInteractive(page: Page) {
-  const inputs: InputInfo[] = await page.evaluate(() => {
+  const inputs: InputInfo[] = await pageEval(page, () => {
     const out: InputInfo[] = [];
     const push = (el: Element, kind: string) => {
       const e = el as HTMLElement;
@@ -65,7 +75,7 @@ async function dumpInteractive(page: Page) {
   console.log('\n--- 入力欄候補 ---');
   inputs.forEach((i) => console.log(JSON.stringify(i)));
 
-  const buttons: ButtonInfo[] = await page.evaluate(() => {
+  const buttons: ButtonInfo[] = await pageEval(page, () => {
     const out: ButtonInfo[] = [];
     document.querySelectorAll('button, [role="button"]').forEach((el) => {
       const e = el as HTMLElement;
@@ -82,7 +92,7 @@ async function dumpInteractive(page: Page) {
 }
 
 async function dumpBiggestText(page: Page) {
-  const blocks: TextBlock[] = await page.evaluate(() => {
+  const blocks: TextBlock[] = await pageEval(page, () => {
     const els = Array.from(document.querySelectorAll('div,article,section,main,p'));
     return els
       .map((el) => {
