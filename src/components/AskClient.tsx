@@ -21,6 +21,34 @@ function initialColumns(services: ServiceInfo[]): Record<string, ColumnState> {
 
 const IDLE_ANALYSIS: AnalysisState = { status: 'idle', text: '' };
 
+/** カラム／分析の本文を Markdown 用に整える（未回答は状態を注記）。 */
+function sectionBody(status: ServiceStatus, text: string, error?: string): string {
+  if (text.trim()) return text.trim();
+  if (status === 'need_login') return '_（ログインが必要なため回答なし）_';
+  if (status === 'error') return `_（エラー: ${error ?? '不明'}）_`;
+  return '_（回答なし）_';
+}
+
+/** 4回答＋分析結果を1つの Markdown 文書に組み立てる。 */
+function buildMarkdown(
+  question: string,
+  services: ServiceInfo[],
+  columns: Record<string, ColumnState>,
+  analysis: AnalysisState,
+): string {
+  const stamp = new Date().toLocaleString('ja-JP');
+  const parts: string[] = [`# ${question || '（質問なし）'}`, '', `_生成日時: ${stamp}_`, ''];
+
+  for (const s of services) {
+    const c = columns[s.id];
+    if (!c) continue;
+    parts.push(`## ${c.name}`, '', sectionBody(c.status, c.text, c.error), '');
+  }
+
+  parts.push('---', '', '## 分析（Claude による比較）', '', sectionBody(analysis.status, analysis.text, analysis.error), '');
+  return parts.join('\n');
+}
+
 /** SSE レスポンスの data: 行を JSON として1件ずつコールバックに流す。 */
 async function readSSE(res: Response, onEvent: (payload: Record<string, unknown>) => void): Promise<void> {
   if (!res.body) return;
@@ -44,7 +72,26 @@ async function readSSE(res: Response, onEvent: (payload: Record<string, unknown>
 export function AskClient({ services }: { services: ServiceInfo[] }) {
   const [columns, setColumns] = useState<Record<string, ColumnState>>(() => initialColumns(services));
   const [analysis, setAnalysis] = useState<AnalysisState>(IDLE_ANALYSIS);
+  const [question, setQuestion] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // ダウンロード可能か（回答か分析のいずれかに本文がある）。
+  const hasContent = services.some((s) => columns[s.id]?.text.trim()) || analysis.text.trim().length > 0;
+
+  const downloadMarkdown = useCallback(() => {
+    const md = buildMarkdown(question, services, columns, analysis);
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    // ファイル名は日時ベース（コロンなどを避ける）。
+    const ts = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+    a.href = url;
+    a.download = `multi-ai-${ts}.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, [question, services, columns, analysis]);
 
   const update = useCallback((id: string, patch: Partial<ColumnState>) => {
     setColumns((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
@@ -80,6 +127,7 @@ export function AskClient({ services }: { services: ServiceInfo[] }) {
   const ask = useCallback(
     async (prompt: string) => {
       setBusy(true);
+      setQuestion(prompt);
       setAnalysis(IDLE_ANALYSIS);
       // 全カラムを接続中にリセット
       setColumns((prev) => {
@@ -146,6 +194,17 @@ export function AskClient({ services }: { services: ServiceInfo[] }) {
   return (
     <div className="flex flex-col gap-6">
       <QuestionInput busy={busy} onSubmit={ask} />
+      <div className="flex items-center justify-end">
+        <button
+          type="button"
+          onClick={downloadMarkdown}
+          disabled={busy || !hasContent}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+          title={busy ? '生成が終わるまでお待ちください' : hasContent ? '4回答と分析を Markdown で保存' : '回答が出るとダウンロードできます'}
+        >
+          ⬇ Markdown をダウンロード
+        </button>
+      </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {services.map((s) => (
           <AnswerColumn key={s.id} state={columns[s.id]} />
