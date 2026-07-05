@@ -100,6 +100,66 @@ async function dumpButtons(page: Page, label: string) {
   buttons.forEach((b) => console.log(JSON.stringify(b)));
 }
 
+/**
+ * 回答コンテナの候補セレクタを実際に当ててみて、件数・可視・末尾テキストを報告する。
+ * Manus の「アシスタント回答」を特定するのが目的。
+ */
+async function probeAnswerSelectors(page: Page) {
+  const rows: { sel: string; count: number; lastLen: number; sample: string }[] = await pageEval(page, () => {
+    // 左チャット領域をスコープにして「最終回答」を取る。ツール（右パネル）の
+    // markdown は除きたいので、chat-message 配下に絞った候補も並べて比較する。
+    const sels = [
+      '[class*="markdown"]',
+      '[class*="chat-message"] [class*="markdown"]',
+      '[class*="chat-message"] [class*="prose"]',
+    ];
+    return sels.map((sel) => {
+      const els = Array.from(document.querySelectorAll(sel)) as HTMLElement[];
+      const visible = els.filter((e) => !!(e.offsetParent || e.getClientRects().length));
+      const last = visible[visible.length - 1];
+      const t = last ? (last.innerText ?? '').trim() : '';
+      return {
+        sel,
+        count: visible.length,
+        lastLen: t.length,
+        sample: (t.slice(0, 60) + ' … ' + t.slice(-60)).replace(/\s+/g, ' '),
+      };
+    });
+  });
+  console.log('--- 回答コンテナ候補プローブ（末尾要素の先頭/末尾60字）---');
+  rows.forEach((r) => console.log(`${r.sel}  visible=${r.count} lastLen=${r.lastLen} "${r.sample}"`));
+}
+
+/** 実行中/完了のシグナルを検出する（スピナー限定・完了は完全句で判定）。 */
+async function dumpStatus(page: Page) {
+  const status = await pageEval(page, () => {
+    const spinAnimate = document.querySelectorAll('[class*="animate-spin"]').length;
+    const bodyText = document.body.innerText ?? '';
+    return {
+      spinAnimate,
+      taskDone: bodyText.includes('タスクが完了しました'),
+      taskDoneEn: /task\s+completed/i.test(bodyText),
+      // 停止ボタンらしき候補（実行中に出るはず）
+      stopBtn: Array.from(document.querySelectorAll('button, [role="button"]'))
+        .filter((el) => {
+          const e = el as HTMLElement;
+          if (!(e.offsetParent || e.getClientRects().length)) return false;
+          const s = (e.getAttribute('aria-label') ?? '') + (e.getAttribute('title') ?? '') + (e.innerText ?? '');
+          return /stop|停止|中断|pause/i.test(s);
+        })
+        .map((el) => {
+          const e = el as HTMLElement;
+          return { label: e.getAttribute('aria-label') ?? '', text: (e.innerText ?? '').trim().slice(0, 20), cls: String(e.className ?? '').slice(0, 50) };
+        })
+        .slice(0, 5),
+    };
+  });
+  console.log(
+    `--- ステータス --- animate-spin=${status.spinAnimate} タスクが完了しました=${status.taskDone} task_completed(en)=${status.taskDoneEn} stopBtn=${status.stopBtn.length}`,
+  );
+  status.stopBtn.forEach((b) => console.log('  stopBtn ' + JSON.stringify(b)));
+}
+
 async function dumpBiggestText(page: Page) {
   const blocks: TextBlock[] = await pageEval(page, () => {
     const els = Array.from(document.querySelectorAll('div,article,section,main,p'));
@@ -159,6 +219,8 @@ async function main() {
       for (let i = 1; i <= 12; i++) {
         await page.waitForTimeout(20_000);
         console.log(`\n===== 観察 ${i}/12（送信から約 ${i * 20} 秒）URL=${page.url()} =====`);
+        await dumpStatus(page);
+        await probeAnswerSelectors(page);
         await dumpBiggestText(page);
       }
     }

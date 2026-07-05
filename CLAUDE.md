@@ -18,7 +18,8 @@
   - `helpers.ts` … `firstVisible` / `humanType` / `streamUntilStable`（完了検知）など共通処理。
   - `base.ts` … `makeChatAdapter()`。claude/chatgpt/gemini はこの共通実装を使う薄いラッパ。
   - `claude.ts` / `chatgpt.ts` / `gemini.ts` … 設定（id/name/url/selectors）のみ。
-  - `manus.ts` … フェーズ2スタブ（`enabled: false`）。
+  - `manus.ts` … Manus（非同期エージェント）用の専用アダプタ。`enabled: true`。完了検知が
+    chat 系と異なる（後述）ため `makeChatAdapter` を使わず独自実装。
   - `index.ts` … `ALL_ADAPTERS` / `ENABLED_ADAPTERS`。
 - UI（`src/components/`）… `AskClient`（SSE 受信＋状態管理）/ `QuestionInput` / `AnswerColumn` / `StatusBadge`。
 
@@ -33,9 +34,10 @@
 - **回答が取れない / 入力できない**: 対象サイトを実際に開いて DevTools で composer / sendButton /
   generatingIndicator / assistantMessage のセレクタを確認し、`selectors.ts` を更新する。
   失敗時のスクショは `.screenshots/` に残る。
-- **Manus を有効化**: `manus.ts` の `enabled` を true にして `submit` / `streamResponse` を実装。
-  Manus は非同期エージェントで完了まで数分かかるため、`streamUntilStable` ではなく
-  実行ステータス監視ベースの完了検知が必要。
+- **Manus のセレクタ修正**: 実 DOM は `npm run debug:manus`（`SUBMIT=1` で送信後も観察）で確認し
+  `selectors.ts` の `manus` を直す。Manus の完了検知は「スピナー（`animate-spin`）が消える」かつ
+  「本文に完了文言『タスクが完了しました』（`completionText`）が出る」の AND で判定している
+  （スピナーはステップ間で一時的に消えるため、文言と組み合わせないと途中で誤完了する）。
 
 ## 制約・注意
 

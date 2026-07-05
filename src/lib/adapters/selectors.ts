@@ -16,9 +16,15 @@ export interface SiteSelectors {
   assistantMessage: string[];
   /** 未ログインを示す要素（これが見えたら need_login） */
   loginIndicator: string[];
+  /**
+   * 非同期エージェント（Manus）用。この文言が本文に出現したらタスク完了とみなす。
+   * 生成インジケータ（スピナー）はステップ間で一時的に消えることがあるため、
+   * 「スピナー消滅」だけでなく「この完了文言の出現」を完了条件に組み合わせる。
+   */
+  completionText?: string[];
 }
 
-export const SELECTORS: Record<Exclude<ServiceId, 'manus'>, SiteSelectors> = {
+export const SELECTORS: Record<ServiceId, SiteSelectors> = {
   claude: {
     composer: ['div[contenteditable="true"].ProseMirror', 'div[contenteditable="true"]'],
     sendButton: [
@@ -80,5 +86,23 @@ export const SELECTORS: Record<Exclude<ServiceId, 'manus'>, SiteSelectors> = {
       'a[aria-label*="Sign in"]',
       'a:has-text("Sign in")',
     ],
+  },
+  // Manus は非同期エージェント。入力欄は tiptap、回答は左チャットの markdown、
+  // 完了は本文に「タスクが完了しました」が出るかで判定する（実 DOM 診断で確認済み）。
+  manus: {
+    composer: ['div.tiptap.ProseMirror[contenteditable="true"]', 'div[contenteditable="true"].tiptap', 'div[contenteditable="true"]'],
+    // 送信はアイコンボタン（aria-label 無し）。Manus は Enter でも送信できるため通常は Enter を使う。
+    sendButton: ['button.rounded-full.border[class*="border-main"]', 'button[type="submit"]'],
+    // 実行中はスピナー（animate-spin）が回る。ステップ間で一時的に消えることがある点に注意。
+    generatingIndicator: ['[class*="animate-spin"]'],
+    // 回答は左チャット領域の markdown。最後の要素が最終回答（途中はステップ経過）。
+    assistantMessage: ['[class*="chat-message"] [class*="markdown"]', '[class*="markdown"]'],
+    // 未ログインだと /login にリダイレクトされ、この文言・OAuth ボタンが出る。
+    loginIndicator: [
+      'text=ログインまたはサインアップ',
+      'button:has-text("Google で続行")',
+      'a[href*="/login"]',
+    ],
+    completionText: ['タスクが完了しました', 'task completed'],
   },
 };

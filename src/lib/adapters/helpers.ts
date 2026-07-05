@@ -125,6 +125,17 @@ export async function safeText(page: Page, selectors: string[]): Promise<string>
   }
 }
 
+/** body の可視テキストにいずれかの文言が含まれるかを返す（非同期エージェントの完了検知用）。 */
+export async function bodyIncludes(page: Page, phrases: string[]): Promise<boolean> {
+  if (!phrases.length) return false;
+  try {
+    const text = await page.evaluate(() => document.body?.innerText ?? '');
+    return phrases.some((p) => text.includes(p));
+  } catch {
+    return false;
+  }
+}
+
 /** いずれかのセレクタが今 visible かを返す。 */
 export async function anyVisible(page: Page, selectors: string[]): Promise<boolean> {
   for (const s of selectors) {

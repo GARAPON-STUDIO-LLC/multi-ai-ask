@@ -17,8 +17,7 @@ const SITES = [
   { name: 'Claude', url: 'https://claude.ai/new' },
   { name: 'ChatGPT', url: 'https://chatgpt.com/' },
   { name: 'Gemini', url: 'https://gemini.google.com/app' },
-  // Manus はフェーズ2:
-  // { name: 'Manus', url: 'https://manus.im/' },
+  { name: 'Manus', url: 'https://manus.im/' },
 ];
 
 async function main() {

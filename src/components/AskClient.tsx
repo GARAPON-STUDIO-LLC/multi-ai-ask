@@ -89,7 +89,7 @@ export function AskClient({ services }: { services: ServiceInfo[] }) {
   return (
     <div className="flex flex-col gap-6">
       <QuestionInput busy={busy} onSubmit={ask} />
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {services.map((s) => (
           <AnswerColumn key={s.id} state={columns[s.id]} />
         ))}

@@ -3,13 +3,13 @@
 このファイルは、別セッション（人間 / AI）が作業を**正確に再開**するための引き継ぎ文書です。
 アーキテクチャ詳細は [`CLAUDE.md`](./CLAUDE.md)、使い方は [`README.md`](./README.md) を参照。
 
-最終更新: 2026-07-01（実サイトで3サービス回答取得まで確認済み）
+最終更新: 2026-07-06（Manus をフェーズ2として実装・実サイトでE2E回答取得まで確認済み）
 
 ---
 
 ## 1. このプロジェクトは何か
 
-1つの質問を **Claude / ChatGPT / Gemini**（フェーズ2で Manus）に同時に投げ、回答を横並びで
+1つの質問を **Claude / ChatGPT / Gemini / Manus** に同時に投げ、回答を横並びで
 比較する**個人ローカル専用** Web アプリ。公式 API ではなく **Playwright によるブラウザ自動操作**で、
 ログイン済みの各サービス Web UI を叩いて回答を回収する。
 
@@ -19,7 +19,7 @@
 |---|---|---|
 | 連携方式 | **ブラウザ自動操作（Playwright）** | 「Claude in Chrome を使用」の意図。Manus に公開 API が無く全 API 方式が不可能。既存サブスクを使える |
 | 利用範囲 | **個人ローカルのみ** | 初回手動ログイン → `.browser-profile/` に永続化。マルチユーザー/デプロイは対象外 |
-| Manus | **フェーズ2に分離** | 非同期エージェントで完了まで数分・完了検知が別ロジックになるため。今は `enabled:false` スタブ |
+| Manus | **フェーズ2として実装済み**（`enabled:true`） | 非同期エージェントで完了まで数分・完了検知が別ロジック。`makeChatAdapter` を使わず独自実装（スピナー消滅 AND「タスクが完了しました」文言で完了判定） |
 | スタック | Next.js 16 + React 19 + TS + Tailwind 4 + Playwright + SSE / npm | ユーザーのハウススタイル準拠 |
 
 ## 3. 現在の状態（フェーズ1）
@@ -41,6 +41,11 @@
   - Claude のセレクタは UI 変更に追従して修正済み（下記）
   - 回答コンテナ: `div.font-claude-response`（`font-claude-message` は廃止）
   - 生成中判定: `div[data-is-streaming="true"]`（web 検索で止まっても誤完了しない）
+- **Manus も実サイトで E2E 回答取得を確認**（2026-07-06）
+  - 入力: `div.tiptap.ProseMirror`（Enter 送信で `/app/<taskId>` に遷移）
+  - 回答: `[class*="chat-message"] [class*="markdown"]` の最後の要素（途中はステップ経過）
+  - 完了検知: スピナー `[class*="animate-spin"]` 消滅 **かつ** 本文に「タスクが完了しました」
+  - ログインは Google OAuth。同プロファイルの Gemini 用 Google セッションを再利用してログイン可
 
 ### 既知の注意 ⚠️
 - DOM 依存のため、各サイトの UI 変更で再びセレクタがズレる可能性がある。
@@ -67,8 +72,8 @@ npm run dev                 # http://localhost:3000
    - 失敗時のスクショは `.screenshots/` に出る。
 2. **完了検知の調整**: 途中で `done` になる/いつまでも `generating` の場合、
    `src/lib/adapters/helpers.ts` の `streamUntilStable` の `stableMs`/`timeoutMs` を調整。
-3. （フェーズ2）Manus 有効化: `src/lib/adapters/manus.ts` の `enabled:true` 化と
-   `submit`/`streamResponse` 実装（実行ステータス監視ベースの完了検知が必要）。
+3. ~~（フェーズ2）Manus 有効化~~ **完了（2026-07-06）**。UI 変更で壊れたら `npm run debug:manus`
+   （`SUBMIT=1` で送信後も観察）でセレクタ・完了文言を再確認し `selectors.ts` の `manus` を直す。
 
 ## 6. ファイルマップ（どこを触るか）
 
