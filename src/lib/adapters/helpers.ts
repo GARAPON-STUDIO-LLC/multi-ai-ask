@@ -1,12 +1,18 @@
 import type { Locator, Page } from 'playwright';
 import type { SiteSelectors } from './selectors';
 
-/** 候補セレクタのうち、最初に DOM 上に存在するものの Locator を返す（無ければ null）。 */
+/** 候補セレクタのうち、最初に visible な要素の Locator を返す（無ければ null）。 */
 export async function firstVisible(page: Page, selectors: string[]): Promise<Locator | null> {
   for (const sel of selectors) {
-    const loc = page.locator(sel).first();
     try {
-      if (await loc.count()) return loc;
+      const locs = page.locator(sel);
+      const n = await locs.count();
+      // 同一セレクタに複数マッチする場合、先頭が非表示でも後続が visible なことがある
+      // （Gemini の contenteditable など）ため、visible なものを探す。
+      for (let i = 0; i < n; i++) {
+        const loc = locs.nth(i);
+        if (await loc.isVisible()) return loc;
+      }
     } catch {
       // 無効なセレクタはスキップ
     }
