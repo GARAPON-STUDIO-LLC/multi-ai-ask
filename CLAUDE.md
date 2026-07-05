@@ -2,9 +2,10 @@
 
 # Multi-AI 一括問い合わせ（プロジェクト概要）
 
-1つの質問を Claude / ChatGPT / Gemini（フェーズ2で Manus）へ同時に投げ、回答を横並びで
-比較する**個人ローカル専用**の Web アプリ。公式 API ではなく **Playwright によるブラウザ
-自動操作**で各サービスのログイン済み Web UI を叩いて回答を回収する。
+1つの質問を Claude / ChatGPT / Gemini / Manus へ同時に投げ、回答を横並びで比較する
+**個人ローカル専用**の Web アプリ。公式 API ではなく **Playwright によるブラウザ
+自動操作**で各サービスのログイン済み Web UI を叩いて回答を回収する。4回答が出そろうと
+Claude が自動で比較分析し、全体を Markdown でダウンロードできる。
 
 ## アーキテクチャ
 
@@ -22,7 +23,7 @@
   - `manus.ts` … Manus（非同期エージェント）用の専用アダプタ。`enabled: true`。完了検知が
     chat 系と異なる（後述）ため `makeChatAdapter` を使わず独自実装。
   - `index.ts` … `ALL_ADAPTERS` / `ENABLED_ADAPTERS`。
-- UI（`src/components/`）… `AskClient`（SSE 受信＋状態管理。全回答完了後に自動で `/api/analyze` を呼ぶ）/ `QuestionInput` / `AnswerColumn` / `AnalysisPanel`（全幅の分析フィールド）/ `StatusBadge`。
+- UI（`src/components/`）… `AskClient`（SSE 受信＋状態管理。全回答完了後に自動で `/api/analyze` を呼び、質問＋4回答＋分析を Markdown でダウンロードするボタンも持つ）/ `QuestionInput` / `AnswerColumn` / `AnalysisPanel`（全幅の分析フィールド）/ `StatusBadge`。
 
 ## 完了検知の方針（重要）
 
