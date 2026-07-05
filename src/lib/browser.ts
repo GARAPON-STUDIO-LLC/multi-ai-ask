@@ -1,7 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { chromium, type BrowserContext, type Page } from 'playwright';
-import type { ServiceId } from './adapters/types';
 
 export const PROFILE_DIR = path.join(process.cwd(), '.browser-profile');
 export const SCREENSHOT_DIR = path.join(process.cwd(), '.screenshots');
@@ -12,7 +11,8 @@ const HEADLESS = process.env.HEADLESS === 'true';
 // Next.js の HMR で複数回 import されてもブラウザを使い回すため globalThis に保持する。
 interface BrowserGlobal {
   context: BrowserContext | null;
-  pages: Map<ServiceId, Page>;
+  // キーはサービス ID が基本だが、分析用の 'analysis' など任意のページキーも持てる。
+  pages: Map<string, Page>;
   launching: Promise<BrowserContext> | null;
 }
 const g = globalThis as unknown as { __multiAiBrowser?: BrowserGlobal };
@@ -49,25 +49,25 @@ export async function getContext(): Promise<BrowserContext> {
  * サービスごとに 1 枚の page を確保する。既存があれば再利用する。
  * url が指定されていて、まだそのページが開かれていなければ遷移する。
  */
-export async function getPage(id: ServiceId, url: string): Promise<Page> {
+export async function getPage(key: string, url: string): Promise<Page> {
   const ctx = await getContext();
-  let page = store.pages.get(id);
+  let page = store.pages.get(key);
   if (page && !page.isClosed()) return page;
 
   page = await ctx.newPage();
-  store.pages.set(id, page);
+  store.pages.set(key, page);
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   return page;
 }
 
-/** 新しい質問のために、対象サービスの page を URL に作り直す（会話をリセット）。 */
-export async function resetPage(id: ServiceId, url: string): Promise<Page> {
-  const existing = store.pages.get(id);
+/** 新しい質問のために、対象ページを URL に作り直す（会話をリセット）。 */
+export async function resetPage(key: string, url: string): Promise<Page> {
+  const existing = store.pages.get(key);
   if (existing && !existing.isClosed()) {
     await existing.close().catch(() => {});
   }
-  store.pages.delete(id);
-  return getPage(id, url);
+  store.pages.delete(key);
+  return getPage(key, url);
 }
 
 /** デバッグ用スクリーンショットを保存し、パスを返す。 */

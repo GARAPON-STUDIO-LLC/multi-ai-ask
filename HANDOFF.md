@@ -31,6 +31,9 @@
 - アダプタ構造（共通ロジック `base.ts` + サイト別設定 + セレクタ集約 `selectors.ts`）
 - 初回ログインスクリプト `npm run setup-login`
 - 完了検知（停止ボタン消滅 + テキスト安定の2段構え）、エラー時スクショ保存
+- **4回答の自動比較分析**（全回答完了後、Claude を専用ページで走らせ共通点・相違点を全幅パネルに表示）
+  - `src/lib/analyzer.ts` + `/api/analyze` + `AnalysisPanel`。E2E 動作確認済み（2026-07-06）
+  - 注意: `humanType` は改行を Shift+Enter で入力する（素の `\n` は Enter＝送信になり複数行プロンプトが途中送信される）
 
 ### 検証済み ✅
 - `npm run build`（型チェック・Lint 含む）成功

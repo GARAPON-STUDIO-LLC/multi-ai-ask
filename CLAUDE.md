@@ -11,7 +11,8 @@
 - `src/app/page.tsx` … サーバーコンポーネント。`enabledServices()` を読んで `AskClient` に渡す。
 - `src/app/api/ask/route.ts` … SSE エンドポイント（`runtime = 'nodejs'` 必須）。`askAll()` のイベントを `data: <json>\n\n` で流す。
 - `src/lib/orchestrator.ts` … 有効アダプタへ並列ファンアウトし、各サービスの進行を `AskEvent` にして1本のストリームにマージ（`askAll`）。
-- `src/lib/browser.ts` … Playwright の**永続コンテキスト**をシングルトン管理（`globalThis` で HMR 越しに保持）。`.browser-profile/` にセッション保存。サービスごとに page を1枚確保。
+- `src/lib/browser.ts` … Playwright の**永続コンテキスト**をシングルトン管理（`globalThis` で HMR 越しに保持）。`.browser-profile/` にセッション保存。ページは**文字列キー**で管理（サービス ID が基本だが、分析用の `'analysis'` など任意キーも持てる）。
+- `src/lib/analyzer.ts` … 4回答の**比較分析**。合成プロンプトを組み立て、**Claude を専用ページ（`'analysis'`）**で走らせて共通点・相違点をストリーム（`/api/analyze`）。回答用の claude ページとは別タブで干渉しない。
 - `src/lib/adapters/` … サービスごとの操作ロジック。
   - `types.ts` … `AIServiceAdapter` インターフェースと `ServiceStatus`。
   - `selectors.ts` … **全サイトの DOM セレクタを集約**（候補配列で上から順にフォールバック）。UI 変更で壊れたら最初にここを直す。
@@ -21,7 +22,7 @@
   - `manus.ts` … Manus（非同期エージェント）用の専用アダプタ。`enabled: true`。完了検知が
     chat 系と異なる（後述）ため `makeChatAdapter` を使わず独自実装。
   - `index.ts` … `ALL_ADAPTERS` / `ENABLED_ADAPTERS`。
-- UI（`src/components/`）… `AskClient`（SSE 受信＋状態管理）/ `QuestionInput` / `AnswerColumn` / `StatusBadge`。
+- UI（`src/components/`）… `AskClient`（SSE 受信＋状態管理。全回答完了後に自動で `/api/analyze` を呼ぶ）/ `QuestionInput` / `AnswerColumn` / `AnalysisPanel`（全幅の分析フィールド）/ `StatusBadge`。
 
 ## 完了検知の方針（重要）
 

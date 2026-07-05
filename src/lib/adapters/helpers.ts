@@ -50,10 +50,19 @@ export async function isLoggedOut(page: Page, sel: SiteSelectors): Promise<boole
   return false;
 }
 
-/** 人間らしく1文字ずつ入力する（Bot 検知緩和）。 */
+/**
+ * 人間らしく1文字ずつ入力する（Bot 検知緩和）。
+ * 改行を含むテキストに対応: 各行を pressSequentially で打ち、行間は Shift+Enter で改行する。
+ * （素の `\n` は pressSequentially では Enter キーとして送られ、チャット UI では
+ *  途中で送信されてしまうため。複数行の分析プロンプト等で必須。）
+ */
 export async function humanType(locator: Locator, text: string): Promise<void> {
   await locator.click();
-  await locator.pressSequentially(text, { delay: 12 });
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (i > 0) await locator.press('Shift+Enter');
+    if (lines[i]) await locator.pressSequentially(lines[i], { delay: 12 });
+  }
 }
 
 interface StreamOptions {
